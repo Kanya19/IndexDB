@@ -1,315 +1,203 @@
-if (!window.localStorage.getItem('version')) {
-    window.localStorage.setItem('version', 1)
-}
+// indexDB.js 
 
-let IndexDB = {
-    init: (databaseName, table, flags, callback) => {
-        let flag = flags;
-        let verIndex = window.localStorage.getItem('version')
-        var request = window.indexedDB.open(databaseName, verIndex);
-        request.onerror = () => {
-            let errdata = {
-                status: 'error',
-                mes: '打开数据库失败！'
-            }
-            callback(errdata)
-        };
-        var indexdb;
-        request.onsuccess = (event) => {
-            indexdb = event.target.result;
-            if (flag == true) {
-                verIndex = parseInt(window.localStorage.getItem('version')) + 1
-                window.localStorage.setItem('version', verIndex);
-            } else {
-                verIndex = parseInt(window.localStorage.getItem('version'))
-            }
-            if (indexdb.objectStoreNames.length > 0) {
-                flag = true
-            }
-            indexdb.isCreate = flag;
-            flag = false;
-            callback(indexdb)
-        };
-        request.onupgradeneeded = (event) => {
-            indexdb = event.target.result;
-            if (!indexdb.objectStoreNames.contains(table)) {
-                if (flag) {
-                    indexdb.createObjectStore(table, {
-                        keyPath: 'id'
-                    });
-                }
-            }
-        }
-    },
-    insertData: (databaseName, table, key, data, callback) => {
-        IndexDB.init(databaseName, table, true, (db) => {
-            try {
-                var addData = [{
-                    id: key,
-                    value: data
-                }]
-                var transaction = db.transaction(table, 'readwrite');
-                var store = transaction.objectStore(table);
-                for (var i = 0; i < addData.length; i++) {
-                    store.add(addData[i]);
-                }
-                let backData = {
-                    status: 'success',
-                    dataBase: databaseName,
-                    table: table,
-                    data: addData
-                }
-                callback(backData)
-            } catch (error) {
-                let errdata = {
-                    status: 'error',
-                    mes: '数据写入失败！'
-                }
-                callback(errdata)
-            }
-            db.close()
-        })
-    },
-    selectData: (databaseName, table, key, callback) => {
-        IndexDB.init(databaseName, table, false, (db) => {
-            if (db.isCreate == false) {
-                let errdata = {
-                    status: 'error',
-                    mes: '获取数据失败！'
-                }
-                callback(errdata)
-                db.close()
-                return
-            } else {
-                var transaction = db.transaction(table, 'readwrite');
-                var store = transaction.objectStore(table);
-                var request = store.get(key);
-                request.onsuccess = (e) => {
-                    try {
-                        var resultData = e.target.result;
-                        let backData = {
-                            status: 'success',
-                            dataBase: databaseName,
-                            table: table,
-                            data: resultData.value
-                        }
-                        callback(backData)
-                    } catch (error) {
-                        let errdata = {
-                            status: 'error',
-                            mes: '数据读取失败！数据库中没有该数据！'
-                        }
-                        callback(errdata)
-                    }
-                };
-                request.onerror = () => {
-                    let errdata = {
-                        status: 'error',
-                        mes: '数据读取失败！'
-                    }
-                    callback(errdata)
-                }
-            }
-            db.close()
-        })
-    },
-    fuSelectData: (databaseName, table, key, callback) => {
-        IndexDB.init(databaseName, table, false, (db) => {
-            if (db.isCreate == false) {
-                let errdata = {
-                    status: 'error',
-                    mes: '获取数据失败！'
-                }
-                callback(errdata)
-                db.close()
-                return
-            } else {
-                var transaction = db.transaction(table, "readonly");
-                var store = transaction.objectStore(table);
-                var request = store.openCursor();
-                request.onsuccess = function (event) {
-                    var cursor = event.target.result;
-                    let addData = cursor
-                    let backData = {
-                        status: 'success',
-                        dataBase: databaseName,
-                        table: table,
-                        data: addData
-                    }
-                    callback(backData)
-                    // if (cursor) {
-                    //     if (cursor.value.word.indexOf(keyword) !== -1 && most <= 5) {
-                    //         most++;
-                    //     }
-                    //     cursor.continue();
-                    // }
-                };
-            }
-            db.close()
-        })
-    },
-    deleteData: (databaseName, table, key, callback) => {
-        IndexDB.init(databaseName, table, false, (db) => {
-            if (db.isCreate == false) {
-                let errdata = {
-                    status: 'error',
-                    mes: '删除数据失败！'
-                }
-                callback(errdata)
-                db.close()
-                return
-            } else {
-                var transaction = db.transaction(table, 'readwrite');
-                var store = transaction.objectStore(table);
-
-                var getresult = store.get(key);
-                let pro = new Promise((resolved) => {
-                    getresult.onsuccess = (e) => {
-                        resolved(e.target.result)
-                        db.close()
-                    }
-                })
-                pro.then(res => {
-                    var result = store.delete(key);
-                    if (res != undefined) {
-                        result.onsuccess = () => {
-                            let errdata = {
-                                status: 'success',
-                                mes: '删除成功！',
-                            }
-                            callback(errdata)
-                        }
-                        result.onerror = () => {
-                            let errdata = {
-                                status: 'error',
-                                mes: '删除失败！'
-                            }
-                            callback(errdata)
-                        }
-                    } else {
-                        let errdata = {
-                            status: 'error',
-                            mes: '数据库中已经没有该数据！'
-                        }
-                        callback(errdata)
-                    }
-                    db.close()
-                })
-            }
-        })
-    },
-    changeData: (databaseName, table, key, data, callback) => {
-        IndexDB.init(databaseName, table, true, (db) => {
-            try {
-                var addData = {
-                    id: key,
-                    value: data
-                }
-                var transaction = db.transaction(table, 'readwrite');
-                var store = transaction.objectStore(table);
-                store.put(addData);
-                let backData = {
-                    status: 'success',
-                    dataBase: databaseName,
-                    table: table,
-                    data: addData
-                }
-                callback(backData)
-            } catch (error) {
-                let errdata = {
-                    status: 'error',
-                    mes: '更新写入失败！'
-                }
-                callback(errdata)
-            }
-            db.close()
-        })
-    },
-    clearTable: (databaseName, table, callback) => {
-        IndexDB.init(databaseName, table, true, (db) => {
-            var transaction = db.transaction(table, 'readwrite');
-            var store = transaction.objectStore(table);
-            var result = store.clear();
-            result.onsuccess = () => {
-                let successmsg = {
-                    status: "success",
-                    msg: "数据表" + table + "清空成功！",
-                }
-                callback(successmsg)
-            }
-            result.onerror = () => {
-                let successmsg = {
-                    status: "success",
-                    msg: "数据表" + table + "清空失败！",
-                }
-                callback(successmsg)
-            }
-        })
-    },
-    readAll: (databaseName, table, callback) => {
-        IndexDB.init(databaseName, table, false, (db) => {
-            if (db.isCreate == false) {
-                let errdata = {
-                    status: 'error',
-                    mes: '获取数据失败！'
-                }
-                callback(errdata)
-                db.close()
-                return
-            } else {
-                var transaction = db.transaction(table);
-                var store = transaction.objectStore(table);
-                var request = store.openCursor();
-                request.onsuccess = (e) => {
-                    try {
-                        console.log('success', e.target.result);
-                        var resultData = e.target.result;
-                        let backData = {
-                            status: 'success',
-                            dataBase: databaseName,
-                            table: table,
-                            data: resultData.value
-                        }
-                        callback(backData)
-                    } catch (error) {
-                        let errdata = {
-                            status: 'error',
-                            mes: '数据读取失败！数据库中没有该数据！'
-                        }
-                        callback(errdata)
-                    }
-                };
-                request.onerror = () => {
-                    let errdata = {
-                        status: 'error',
-                        mes: '数据读取失败！'
-                    }
-                    callback(errdata)
-                }
-            }
-            db.close()
-        })
-    },
-    IndexDB: () => {
-
+// 打开或创建数据库(如果已经存在就打开，否则就创建)
+var dbName = 'zzx';
+// success, error 可以不传
+function openDB(version, success, error) {
+    var req = indexedDB.open(dbName, version);
+    //TODO:升级事件
+    req.onupgradeneeded = function(event) {
+        console.log('event',event)
+        req = event.target.result;
+        success && (typeof success == 'function') ? success() : '';
     }
+    req.onsuccess = function() {
+        success && (typeof success == 'function') ? success() : '';
+    };
+    req.onerror = function() {
+        console.error('数据库打开或创建失败，请重试');
+        // 如果用户传递了回调函数，那就调用，否则不反馈
+        error && (typeof error == 'function') ? error() : '';
+    };
+    return req;
 }
 
-export default IndexDB
+/* 创建数据表，每创建一个数据表，数据库的版本都要 +1(初始版本是 1)
+ * dbVersion: 数据库版本
+ * tabName: 要创建的表格的名称
+ * key: 主键, 如果需要自动生成，key 就传 ''，否则 key 就是主键名称
+ * keyList: 数组，表格中的键的列表，示例数据:
+ *          [{
+ *             name: 'username', // 键的名称
+ *             unique: true // 用户明是否唯一，如果唯一，为true
+ *          },{
+ *             name: 'email',
+ *             unique: true
+ *          },{
+ *             name: 'tel',
+ *             unique: false
+ *          }]
+ * success: 表格创建成功之后的回调，可以不传
+ * error: 表格创建之后的回调，可以不传
+ */
+function createTable(dbVersion, tabName, key, keyList, success, error) {
+    var req = openDB(dbVersion, success, error);
 
-function fuzzySearch(db, keyword) {
-    var transaction = db.transaction("notes", "readonly");
-    var objectStore = transaction.objectStore("notes");
-    var request = objectStore.openCursor();
-    var most = 0;
-    request.onsuccess = function (event) {
-        var cursor = event.target.result;
-        if (cursor) {
-            if (cursor.value.word.indexOf(keyword) !== -1 && most <= 5) {
-                most++;
-            }
-            cursor.continue();
-        }
+    req.onupgradeneeded = function(e) {
+        var db = e.target.result;
+
+        // 创建一张数据表
+        var obj = key ? {keyPath: key} : {autoIncrement: true};
+        var store = db.createObjectStore(tabName, obj);
+        keyList.forEach(function(item) {
+            store.createIndex(item.name, item.name, {unique: item.unique});
+        });
     };
 }
 
+// 获取objectStore 对象的公共函数
+function getStore(e, tabName) {
+    var db = e.target.result;
+    var transaction = db.transaction([tabName], "readwrite");
+    return transaction.objectStore(tabName);
+}
+
+/*
+ * 向数据库中添加数据:
+ * dbVersion: 数据库的版本号(最新)
+ * tabName: 要添加数据的表格
+ * data: 要添加的数据，是个对象，对象中是这个表格中的所有的键值对列表
+ * success: 数据添加成功的回调
+ * fail: 数据添加失败的回调
+ * */
+function add(dbVersion, tabName, data, success, fail) {
+    var req = openDB(dbVersion);
+    req.onsuccess = function(e) {
+        var store = getStore(e, tabName);
+        var request = store.add(data);
+        request.onsuccess = function(event) {
+            success && (typeof success == 'function') ? success(event) : '';
+        };
+        request.onerror = function(error) {
+            fail && (typeof fail == 'function') ? fail(error) : '';
+        };
+    };
+}
+
+/* 根据主键获取数据：
+ * dbVersion: 要操作的数据库的版本号(最新)
+ * tabName: 表格名称
+ * key: 要获取的数据的主键
+ * */
+function getData(dbVersion, tabName ,key, success, error) {
+    var req = openDB(dbVersion);
+    req.onsuccess = function(e) {
+        var store = getStore(e, tabName);
+        var request = store.get(key);
+        request.onsuccess = function(e) {
+            console.log('e',e,request,key)
+            success && (typeof success == 'function') ? success(request.result) : '';
+        };
+        request.onerror = function(e) {
+            error && (typeof error == 'function') ? error() : '';
+        };
+    };
+}
+
+/*
+ * 获取某个数据表中的数据列表:
+ * dbVersion: 数据库的最新版本号
+ * tabName: 要获取数据的数据表名
+ * */
+function getList(dbVersion, tabName, success) {
+    var req = openDB(dbVersion);
+    req.onsuccess = function(e) {
+        var store = getStore(e, tabName);
+        var arr = []; // 要承接所有的返回列表
+        store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+                arr.push(cursor.value); // 将当次拿到的值 push 到了arr 中
+                cursor.continue(); // 循环
+            } else {
+                success && typeof success == 'function' ? success(arr) : '';
+            }
+        };
+    };
+}
+
+
+function fuGetList(dbVersion, tabName,data, success) {
+    var req = openDB(dbVersion);
+    req.onsuccess = function(e) {
+        var store = getStore(e, tabName);
+        var arr = []; // 要承接所有的返回列表
+        store.openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor&&cursor.value[data.key].indexOf(data.value)!==-1) {
+                arr.push(cursor.value); // 将当次拿到的值 push 到了arr 中
+                cursor.continue(); // 循环
+            } else {
+                success && typeof success == 'function' ? success(arr) : '';
+            }
+        };
+    };
+}
+/* 根据主键删除数据:
+ * dbVersion: 数据库最新版本号
+ * tabName: 要删除数据的数据表
+ * key: 要删除的数据的主键值
+ * success: 删除成功的回调
+ * error: 删除失败的回调
+ * */
+function deleteData(dbVersion, tabName, key, success, error) {
+    var req = openDB(dbVersion);
+    req.onsuccess = function(e) {
+        var db = e.target.result;
+        var request = db.transaction([tabName], "readwrite").objectStore(tabName).delete(key);
+        request.onsuccess = function(e) {
+            // 删除成功！
+            success && (typeof success == 'function') ? success() : '';
+        };
+        request.onerror = function() {
+            error && (typeof error == 'function') ? error() : '';
+        };
+    };
+}
+
+/* 修改数据 */
+function update(dbVersion, tabName, key, newData, success, error) {
+    var req = openDB(dbVersion);
+    req.onsuccess = function(e) {
+        var store = getStore(e, tabName);
+        var request = store.get(key);
+        request.onerror = function () {
+            console.error('内部服务器错误');
+        };
+        request.onsuccess = function(ev) {
+            var data = ev.target.result;
+            for(var k in newData) {
+                data[k] = newData[k];
+            }
+            var requestUpdate = store.put(data);
+            requestUpdate.onerror = function() {
+                // 错误处理
+                error && (typeof error == 'function') ? error() : '';
+            };
+            requestUpdate.onsuccess = function() {
+                success && typeof success == 'function' ? success() : '';
+            };
+        };
+    };
+}
+
+export {
+    openDB,
+    createTable,
+    getStore,
+    add,
+    getData,
+    getList,
+    deleteData,
+    update
+}
