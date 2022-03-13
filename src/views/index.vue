@@ -252,7 +252,7 @@ export default {
         tableName: "user",
         data: {
           nickname: state.nickname2,
-          createdAt: new Date()
+          time: new Date()
         },
         success: () => console.log("添加成功")
       });
@@ -291,7 +291,7 @@ export default {
           console.log(arr)
           arr.map((item, key) => {
             item.id = key
-            item.createdAt = dateformat(item.createdAt)
+            item.createdAt = dateformat(item.time)
           })
           state.arr = arr
         }
@@ -305,7 +305,7 @@ export default {
           console.log(arr)
           arr.map((item, key) => {
             item.id = key
-            item.createdAt = dateformat(item.createdAt)
+            item.createdAt = dateformat(item.time)
           })
           arr.sort((a,b)=>b.time-a.time)
           state.arr = arr
